@@ -1,83 +1,84 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Разблокировка VanMoof + Скорость</title>
-  <script src="https://cdn.jsdelivr.net/npm/vanbike-lib/dist/vanbike-lib.min.js"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; }
-    input, button, select { margin: 10px; padding: 8px; }
-    #log { text-align: left; margin: 20px auto; max-width: 500px; background: #eee; padding: 10px; border-radius: 6px; white-space: pre-wrap; }
+    body {
+      font-family: sans-serif;
+      background: #f8f8f8;
+      padding: 1em;
+      color: #333;
+    }
+    input, select, button {
+      padding: 0.5em;
+      margin: 0.5em 0;
+      font-size: 1em;
+    }
+    #log {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 1em;
+      white-space: pre-wrap;
+      font-family: monospace;
+    }
+    button {
+      cursor: pointer;
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/gh/Poket-Jony/vanbike-lib/dist/vanbike-lib.js"></script>
 </head>
 <body>
+  <h2>🔒 Разблокировка VanMoof + Установка скорости</h2>
 
-<h2>🔒 Разблокировка VanMoof + Установка скорости</h2>
+  <input id="unlockCode" placeholder="Введите код разблокировки" style="width: 100%;" />
+  <br>
+  <button onclick="unlockBike()">🔒 Разблокировать</button>
+  <button onclick="setSpeedLimit(25)">🚴️ Установить лимит 25 км/ч</button>
+  <button onclick="setSpeedLimit(32)">🏎️ Установить лимит 32 км/ч</button>
 
-<input type="text" id="unlockKey" placeholder="Введите код разблокировки">
-<br>
-<button id="btnUnlock">🔓 Разблокировать</button>
-<button id="btn25">🚲 Установить лимит 25 км/ч</button>
-<button id="btn32">🎓 Установить лимит 32 км/ч</button>
+  <div id="log"></div>
 
-<div id="log"></div>
+  <script>
+    const log = msg => {
+      const area = document.getElementById("log");
+      const time = new Date().toLocaleTimeString();
+      area.textContent += `\n[${time}] ${msg}`;
+      area.scrollTop = area.scrollHeight;
+    };
 
-<script>
-const logDiv = document.getElementById('log');
-function log(msg) {
-  const time = new Date().toLocaleTimeString();
-  logDiv.textContent += `\n[${time}] ${msg}`;
-  logDiv.scrollTop = logDiv.scrollHeight;
-}
+    let bike;
 
-let service = null;
+    async function unlockBike() {
+      const code = document.getElementById("unlockCode").value.trim();
+      if (!code) return log("\u274c Введите код!");
 
-async function connectAndPrepare() {
-  const key = document.getElementById('unlockKey').value.trim();
-  if (!key) return log('❌ Введите код разблокировки');
-  const profile = new vanbikeLib.ElectrifiedSX1Profile();
-  service = new vanbikeLib.VanBikeService(profile, key);
-  const bike = await service.requestDevice();
-  await bike.connect();
-  return bike;
-}
+      log("\uD83D\uDD0D \u041F\u043E\u0438\u0441\u043A велосипеда...");
+      try {
+        bike = await Vanbike.discover();
+        log(`\uD83D\uDD17 \u041F\u043Eдкл\u044E\u0447\u0435ние к ${bike.name}...`);
+        await bike.connect();
+        await bike.unlock(code);
+        log("✅ Велосипед разблокирован!");
+      } catch (e) {
+        log(`❌ \u041Eшибка: ${e.message}`);
+      }
+    }
 
-btnUnlock.onclick = async () => {
-  try {
-    log('🔍 Поиск велосипеда...');
-    const bike = await connectAndPrepare();
-    log('✅ Велосипед разблокирован!');
-    await bike.disconnect();
-  } catch (e) {
-    log('❌ ' + e);
-  }
-};
-
-btn25.onclick = async () => {
-  try {
-    log('⚙️ Установка лимита 25 км/ч...');
-    const bike = await connectAndPrepare();
-    await service.setRegion('EU');
-    log('✅ Установлен европейский лимит 25 км/ч');
-    await bike.disconnect();
-  } catch (e) {
-    log('❌ ' + e);
-  }
-};
-
-btn32.onclick = async () => {
-  try {
-    log('🚀 Установка лимита 32 км/ч...');
-    const bike = await connectAndPrepare();
-    await service.setRegion('US');
-    log('✅ Установлен лимит 32 км/ч (США)');
-    await bike.disconnect();
-  } catch (e) {
-    log('❌ ' + e);
-  }
-};
-</script>
-
+    async function setSpeedLimit(kph) {
+      if (!bike || !bike.isConnected()) {
+        log("❌ \u0412елосипед не подключен.");
+        return;
+      }
+      try {
+        await bike.setSpeedLimit(kph);
+        log(`✅ Установлен лимит: ${kph} км/ч`);
+      } catch (e) {
+        log(`❌ \u041Eшибка: ${e.message}`);
+      }
+    }
+  </script>
 </body>
 </html>
 
