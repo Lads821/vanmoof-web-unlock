@@ -1,87 +1,98 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Разблокировка VanMoof + Скорость</title>
+  <meta charset="UTF-8">
+  <title>🔓 VanMoof Разблокировка и Скорость</title>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #f8f8f8;
-      padding: 1em;
-      color: #333;
-    }
-    input, select, button {
-      padding: 0.5em;
-      margin: 0.5em 0;
-      font-size: 1em;
-    }
-    #log {
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 1em;
-      white-space: pre-wrap;
-      font-family: monospace;
-    }
-    button {
-      cursor: pointer;
-    }
+    body { font-family: sans-serif; background: #f2f2f2; padding: 20px; }
+    h1 { font-size: 18px; }
+    input, button, select { margin: 6px 0; padding: 10px; font-size: 14px; }
+    #log { white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; font-family: monospace; }
   </style>
-  <script src="https://cdn.jsdelivr.net/gh/Poket-Jony/vanbike-lib/dist/vanbike-lib.js"></script>
 </head>
 <body>
-  <h2>🔒 Разблокировка VanMoof + Установка скорости</h2>
 
-  <input id="unlockCode" placeholder="Введите код разблокировки" style="width: 100%;" />
-  <br>
-  <button onclick="unlockBike()">🔒 Разблокировать</button>
-  <button onclick="setSpeedLimit(25)">🚴️ Установить лимит 25 км/ч</button>
-  <button onclick="setSpeedLimit(32)">🏎️ Установить лимит 32 км/ч</button>
+<h1>🔐 Безопасная разблокировка VanMoof</h1>
 
-  <div id="log"></div>
+<label for="serviceUuid">UUID сервиса (разблокировка):</label><br>
+<select id="serviceUuid">
+  <option value="8e7f1a50-087a-44c9-b292-a2c628fdd9aa">8e7f1a50-087a-44c9-b292-a2c628fdd9aa</option>
+</select><br>
 
-  <script>
-    const log = msg => {
-      const area = document.getElementById("log");
-      const time = new Date().toLocaleTimeString();
-      area.textContent += `\n[${time}] ${msg}`;
-      area.scrollTop = area.scrollHeight;
-    };
+<input id="keyInput" placeholder="Введите 32-символьный ключ" size="40"><br>
+<button onclick="unlockBike()">🔓 Разблокировать велосипед</button><br><br>
 
-    let bike;
+<button onclick="setSpeed(25)">🚲 Установить лимит 25 км/ч</button>
+<button onclick="setSpeed(32)">🚀 Установить лимит 32 км/ч</button><br><br>
 
-    async function unlockBike() {
-      const code = document.getElementById("unlockCode").value.trim();
-      if (!code) return log("\u274c Введите код!");
+<div id="log">Готово.</div>
 
-      log("\uD83D\uDD0D \u041F\u043E\u0438\u0441\u043A велосипеда...");
-      try {
-        bike = await Vanbike.discover();
-        log(`\uD83D\uDD17 \u041F\u043Eдкл\u044E\u0447\u0435ние к ${bike.name}...`);
-        await bike.connect();
-        await bike.unlock(code);
-        log("✅ Велосипед разблокирован!");
-      } catch (e) {
-        log(`❌ \u041Eшибка: ${e.message}`);
-      }
+<script>
+const log = msg => {
+  const box = document.getElementById("log");
+  box.textContent += "\n[" + new Date().toLocaleTimeString() + "] " + msg;
+  box.scrollTop = box.scrollHeight;
+};
+
+async function unlockBike() {
+  log("🔍 Поиск велосипеда...");
+  try {
+    const serviceUuid = document.getElementById('serviceUuid').value;
+    const key = document.getElementById("keyInput").value.trim();
+    if (!/^[0-9a-fA-F]{32}$/.test(key)) {
+      log("❌ Неверный ключ (ожидается 32 hex символа)");
+      return;
     }
 
-    async function setSpeedLimit(kph) {
-      if (!bike || !bike.isConnected()) {
-        log("❌ \u0412елосипед не подключен.");
-        return;
-      }
-      try {
-        await bike.setSpeedLimit(kph);
-        log(`✅ Установлен лимит: ${kph} км/ч`);
-      } catch (e) {
-        log(`❌ \u041Eшибка: ${e.message}`);
-      }
-    }
-  </script>
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'VANMOOF' }],
+      optionalServices: [serviceUuid]
+    });
+
+    log("🔗 Подключение к " + device.name + "...");
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(serviceUuid);
+
+    // Характеристика для разблокировки (WRITE)
+    const characteristic = await service.getCharacteristic("8e7f1a53-087a-44c9-b292-a2c628fdd9aa");
+    const bytes = new Uint8Array(key.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+
+    await characteristic.writeValueWithoutResponse(bytes);
+    log("✅ Велосипед разблокирован!");
+  } catch (e) {
+    log("❌ Ошибка при разблокировке: " + e.message);
+  }
+}
+
+async function setSpeed(kmh) {
+  const targetSpeed = kmh === 32 ? "США" : "ЕС";
+  log("⚙️ Установка лимита " + kmh + " км/ч (" + targetSpeed + ")...");
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'VANMOOF' }],
+      optionalServices: ["f000ffc0-0451-4000-b000-000000000000"]
+    });
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService("f000ffc0-0451-4000-b000-000000000000");
+    const characteristic = await service.getCharacteristic("f000ffc3-0451-4000-b000-000000000000");
+
+    const hex = kmh === 32
+      ? "0f0d0000000000000000000000000000"
+      : "00000000000000000000000000000000";
+
+    const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+
+    await characteristic.writeValue(bytes);
+    log("✅ Лимит установлен: " + kmh + " км/ч");
+  } catch (e) {
+    log("❌ Ошибка при установке лимита: " + e.message);
+  }
+}
+</script>
+
 </body>
 </html>
-
 
 
 
