@@ -1,14 +1,27 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <title>VanMoof Unlock</title>
-</head>
-<body>
-  <h1>VanMoof Speed Unlocker</h1>
-  <button id="connect">🔌 Подключиться</button>
-  <button id="unlock">🚀 Установить US‑режим</button>
-  <pre id="log" style="max-height:200px;overflow:auto;"></pre>
-  <script type="module" src="index.js"></script>
-</body>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>VanMoof Web Unlock</title>
+  </head>
+  <body>
+    <h1>🔓 Подключиться к VanMoof</h1>
+    <button id="connect">Подключиться</button>
+
+    <script>
+      document.getElementById('connect').addEventListener('click', async () => {
+        try {
+          const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['battery_service'] // можно расширить
+          });
+          console.log('Устройство найдено:', device.name);
+          alert(`Найдено устройство: ${device.name}`);
+        } catch (error) {
+          console.error('Ошибка подключения:', error);
+          alert('Ошибка: ' + error.message);
+        }
+      });
+    </script>
+  </body>
 </html>
