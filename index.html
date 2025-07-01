@@ -2,64 +2,98 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Безопасная разблокировка VanMoof</title>
+  <title>VanMoof Web Unlock</title>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 2em; background: #f2f2f2; }
-    button, input, select { font-size: 1em; padding: 0.5em; margin: 0.5em; }
-    #log { background: #fff; padding: 1em; border: 1px solid #ccc; text-align: left; max-width: 600px; margin: 2em auto; white-space: pre-wrap; font-family: monospace; }
+    button, input, select { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; }
+    #log { white-space: pre-wrap; background: #fff; padding: 1em; border: 1px solid #ccc; max-width: 90%; margin: auto; font-family: monospace; }
   </style>
 </head>
 <body>
-  <h1>🔐 Безопасная разблокировка VanMoof</h1>
-  <label for="serviceUuid">Выберите UUID сервиса:</label>
-  <select id="serviceUuid">
-    <option value="f000ffc0-0451-4000-b000-000000000000" selected>f000ffc0-0451-4000-b000-000000000000</option>
+  <h1>🔓 Безопасная разблокировка VanMoof</h1>
+  <label>Выберите UUID сервиса:</label>
+  <select id="serviceUUID">
     <option value="8e7f1a50-087a-44c9-b292-a2c628fdd9aa">8e7f1a50-087a-44c9-b292-a2c628fdd9aa</option>
+    <option value="f000ffc0-0451-4000-b000-000000000000">f000ffc0-0451-4000-b000-000000000000</option>
   </select>
   <br>
-  <input type="text" id="unlockCode" placeholder="Введите код разблокировки (32 hex)" size="40">
+  <input type="text" id="unlockCode" placeholder="Код разблокировки (32 hex)" />
+  <br>
+  <input type="number" id="speedLimit" placeholder="Новый лимит скорости (км/ч)" min="25" max="40" />
   <br>
   <button onclick="connectAndUnlock()">🔓 Разблокировать велосипед</button>
 
   <div id="log"></div>
 
   <script>
+    function log(msg) {
+      const div = document.getElementById('log');
+      div.textContent += msg + "\n";
+    }
+
     async function connectAndUnlock() {
-      const log = document.getElementById("log");
-      log.textContent = "🔍 Поиск велосипеда...";
+      const unlockCode = document.getElementById('unlockCode').value.trim();
+      const speedLimit = parseInt(document.getElementById('speedLimit').value.trim());
+      const serviceUUID = document.getElementById('serviceUUID').value;
+
+      if (!unlockCode || unlockCode.length !== 32) {
+        log("❌ Введите корректный 32-символьный hex-код разблокировки.");
+        return;
+      }
 
       try {
+        log("🔍 Поиск велосипеда...");
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'VANMOOF' }],
-          optionalServices: [document.getElementById("serviceUuid").value]
+          optionalServices: [serviceUUID]
         });
 
-        log.textContent += `\n🔗 Подключение к ${device.name}...`;
+        log("🔗 Подключение к " + device.name + "...");
         const server = await device.gatt.connect();
-
-        const serviceUuid = document.getElementById("serviceUuid").value;
-        const service = await server.getPrimaryService(serviceUuid);
+        const service = await server.getPrimaryService(serviceUUID);
 
         const characteristics = await service.getCharacteristics();
-        const writable = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
 
-        if (!writable) {
-          log.textContent += "\n❌ Нет характеристики для записи.";
+        let codeWritten = false;
+        let speedWritten = false;
+
+        for (const char of characteristics) {
+          if (char.properties.write || char.properties.writeWithoutResponse) {
+            const encoder = new TextEncoder();
+            const codeBytes = Uint8Array.from(unlockCode.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            await char.writeValue(codeBytes);
+            codeWritten = true;
+            log("✅ Код разблокировки отправлен.");
+            break;
+          }
+        }
+
+        if (!codeWritten) {
+          log("❌ Не удалось найти характеристику для отправки кода.");
           return;
         }
 
-        const unlockCode = document.getElementById("unlockCode").value.trim();
-        if (!/^[0-9a-fA-F]{32}$/.test(unlockCode)) {
-          log.textContent += "\n❌ Неверный код (ожидается 32 hex символа).";
-          return;
+        if (!isNaN(speedLimit)) {
+          for (const char of characteristics) {
+            if (char.properties.write || char.properties.writeWithoutResponse) {
+              try {
+                const speedBytes = new Uint8Array([speedLimit]);
+                await char.writeValue(speedBytes);
+                speedWritten = true;
+                log("✅ Лимит скорости установлен: " + speedLimit + " км/ч");
+                break;
+              } catch {}
+            }
+          }
+
+          if (!speedWritten) {
+            log("⚠️ Не удалось установить лимит скорости.");
+          }
         }
 
-        const value = new Uint8Array(unlockCode.match(/.{2}/g).map(b => parseInt(b, 16)));
-        await writable.writeValue(value);
-
-        log.textContent += "\n✅ Велосипед разблокирован!";
+        log("🚲 Велосипед разблокирован!");
       } catch (err) {
-        log.textContent += `\n❌ Ошибка: ${err.message}`;
+        log("❌ Ошибка: " + err);
       }
     }
   </script>
