@@ -1,52 +1,57 @@
-<!DOCTYPE html>
-<html>
+""<!DOCTYPE html>
+<html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <title>VanMoof Unlock</title>
+  <meta charset="UTF-8">
+  <title>VanMoof Web Unlock</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 2em; background: #f2f2f2; }
+    button, input { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; }
+  </style>
 </head>
 <body>
-  <h1>🔐 Безопасная разблокировка VanMoof</h1>
-  <button id="connect">Разблокировать велосипед</button>
-  <pre id="log" style="background:#eee; padding:1em;"></pre>
+  <h1>🔓 Разблокировать VanMoof</h1>
+  <input type="text" id="unlockCode" placeholder="Введите код разблокировки" />
+  <br>
+  <button onclick="connectAndUnlock()">Подключиться и разблокировать</button>
+
+  <p id="status"></p>
 
   <script>
-    const log = (msg) => {
-      document.getElementById("log").textContent += msg + "\n";
-    };
+    const SERVICE_UUID = '00001810-0000-1000-8000-00805f9b34fb'; // Пример сервиса, заменить при необходимости
+    const CHARACTERISTIC_UUID = '00002a56-0000-1000-8000-00805f9b34fb'; // Пример характеристики, заменить при необходимости
 
-    function hexStringToByteArray(hex) {
-      const result = [];
-      for (let i = 0; i < hex.length; i += 2) {
-        result.push(parseInt(hex.substr(i, 2), 16));
-      }
-      return new Uint8Array(result);
-    }
-
-    document.getElementById('connect').addEventListener('click', async () => {
-      const keyHex = prompt("Введи unlock key (16 байт в hex, например 2b17bc04...):");
-      if (!keyHex || keyHex.length !== 32) {
-        alert("❌ Неверный ключ (ожидается 32 hex символа)");
-        return;
-      }
+    async function connectAndUnlock() {
+      const status = document.getElementById('status');
+      status.textContent = "Поиск велосипеда...";
 
       try {
-        log("🔍 Поиск велосипеда...");
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'VANMOOF' }],
-          optionalServices: [0xfee0]
+          optionalServices: [SERVICE_UUID]
         });
 
+        status.textContent = "Подключение к " + device.name + "...";
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(0xfee0);
-        const characteristic = await service.getCharacteristic('00000004-0000-1000-8000-00805f9b34fb');
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-        const payload = hexStringToByteArray(keyHex);
-        await characteristic.writeValue(payload);
-        log("✅ Велосипед разблокирован!");
+        const code = document.getElementById('unlockCode').value.trim();
+        if (!code || code.length < 4) {
+          status.textContent = "Пожалуйста, введите действительный код.";
+          return;
+        }
+
+        const encoder = new TextEncoder();
+        const value = encoder.encode(code);
+        await characteristic.writeValue(value);
+
+        status.textContent = "🚲 Велосипед разблокирован!";
       } catch (err) {
-        log("❌ Ошибка: " + err.message);
+        console.error(err);
+        status.textContent = "Ошибка: " + err.message;
       }
-    });
+    }
   </script>
 </body>
-</html>
+</html>"
+
