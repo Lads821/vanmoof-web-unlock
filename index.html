@@ -2,80 +2,70 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>VanMoof Web Unlock</title>
+  <title>Безопасная разблокировка VanMoof</title>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 2em; background: #f2f2f2; }
     button, input, select { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; }
-    #log { white-space: pre-wrap; text-align: left; margin: 2em auto; width: 90%; max-width: 600px; background: #fff; padding: 1em; border-radius: 8px; }
+    #log { font-family: monospace; white-space: pre-wrap; text-align: left; margin: 1em auto; max-width: 600px; background: #fff; padding: 1em; border-radius: 8px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
   <h1>🔐 Безопасная разблокировка VanMoof</h1>
-  <input type="text" id="encryptionKey" placeholder="32-символьный ключ (hex)" />
-  <br>
-  <label for="uuid">UUID сервиса:</label>
-  <select id="uuid">
-    <option value="0000fee0-0000-1000-8000-00805f9b34fb">FEE0 (по умолчанию)</option>
-    <option value="00001810-0000-1000-8000-00805f9b34fb">1810 (альтернатива)</option>
+  <label for="uuidSelect">Выберите UUID сервиса:</label>
+  <select id="uuidSelect">
+    <option value="0000fee0-0000-1000-8000-00805f9b34fb">0000fee0-0000-1000-8000-00805f9b34fb (default)</option>
+    <option value="6e400001-b5a3-f393-e0a9-e50e24dcca9e">6e400001-b5a3-f393-e0a9-e50e24dcca9e (Nordic UART)</option>
+    <option value="6e400003-b5a3-f393-e0a9-e50e24dcca9e">6e400003-b5a3-f393-e0a9-e50e24dcca9e (Write)</option>
   </select>
   <br>
-  <button onclick="connectAndTestService()">🔓 Разблокировать велосипед</button>
+  <input type="text" id="unlockCode" placeholder="Введите 32-символьный HEX код" />
+  <br>
+  <button onclick="connectAndUnlock()">🔓 Разблокировать велосипед</button>
   <div id="log"></div>
 
   <script>
-    function log(text) {
-      const logBox = document.getElementById('log');
-      logBox.textContent += text + "\n";
+    function log(message) {
+      const logElement = document.getElementById("log");
+      logElement.textContent += message + "\n";
     }
 
-    async function connectAndTestService() {
-      log("Поиск велосипеда...");
+    async function connectAndUnlock() {
+      log("🔍 Поиск велосипеда...");
+      const selectedUUID = document.getElementById("uuidSelect").value;
+      const unlockKey = document.getElementById("unlockCode").value.trim();
+
+      if (!/^([a-fA-F0-9]{32})$/.test(unlockKey)) {
+        log("❌ Неверный ключ (ожидается 32 hex символа)");
+        return;
+      }
+
       try {
-        const key = document.getElementById('encryptionKey').value.trim();
-        if (!/^[0-9a-fA-F]{32}$/.test(key)) {
-          alert("Неверный ключ — требуется 32 hex символа.");
-          return;
-        }
-
-        const serviceUUID = document.getElementById('uuid').value;
-
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'VANMOOF' }],
-          optionalServices: [serviceUUID]
+          optionalServices: [selectedUUID]
         });
 
-        log("🔗 Подключение к " + device.name + "...");
+        log(`🔗 Подключение к ${device.name}...`);
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(serviceUUID);
-
-        log("✅ Сервис " + serviceUUID + " найден.");
+        const service = await server.getPrimaryService(selectedUUID);
 
         const characteristics = await service.getCharacteristics();
-        log("Найдено характеристик: " + characteristics.length);
-
-        for (let char of characteristics) {
-          log("➡ Характеристика: " + char.uuid);
-        }
-
-        // Найдём подходящую характеристику (можно уточнить позже)
-        const writeChar = characteristics.find(c => c.properties.write);
-        if (!writeChar) {
-          log("❌ Нет доступных характеристик для записи.");
+        const targetChar = characteristics.find(c => c.properties.write);
+        if (!targetChar) {
+          log("❌ Не найдена характеристика для записи.");
           return;
         }
 
-        const encoder = new TextEncoder();
-        const value = encoder.encode(key);
-        await writeChar.writeValue(value);
-
-        log("🚲 Велосипед разблокирован! Ключ записан в: " + writeChar.uuid);
-      } catch (e) {
-        log("❌ Ошибка: " + e.message);
-        console.error(e);
+        const value = new Uint8Array(unlockKey.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        await targetChar.writeValue(value);
+        log("✅ Велосипед разблокирован!");
+      } catch (error) {
+        log("❌ Ошибка: " + error.message);
       }
     }
   </script>
 </body>
 </html>
+
 
 
