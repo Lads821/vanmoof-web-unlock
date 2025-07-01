@@ -1,57 +1,81 @@
-""<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <title>VanMoof Web Unlock</title>
   <style>
     body { font-family: sans-serif; text-align: center; padding: 2em; background: #f2f2f2; }
-    button, input { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; }
+    button, input, select { font-size: 1.2em; padding: 0.5em 1em; margin: 0.5em; }
+    #log { white-space: pre-wrap; text-align: left; margin: 2em auto; width: 90%; max-width: 600px; background: #fff; padding: 1em; border-radius: 8px; }
   </style>
 </head>
 <body>
-  <h1>🔓 Разблокировать VanMoof</h1>
-  <input type="text" id="unlockCode" placeholder="Введите код разблокировки" />
+  <h1>🔐 Безопасная разблокировка VanMoof</h1>
+  <input type="text" id="encryptionKey" placeholder="32-символьный ключ (hex)" />
   <br>
-  <button onclick="connectAndUnlock()">Подключиться и разблокировать</button>
-
-  <p id="status"></p>
+  <label for="uuid">UUID сервиса:</label>
+  <select id="uuid">
+    <option value="0000fee0-0000-1000-8000-00805f9b34fb">FEE0 (по умолчанию)</option>
+    <option value="00001810-0000-1000-8000-00805f9b34fb">1810 (альтернатива)</option>
+  </select>
+  <br>
+  <button onclick="connectAndTestService()">🔓 Разблокировать велосипед</button>
+  <div id="log"></div>
 
   <script>
-    const SERVICE_UUID = '00001810-0000-1000-8000-00805f9b34fb'; // Пример сервиса, заменить при необходимости
-    const CHARACTERISTIC_UUID = '00002a56-0000-1000-8000-00805f9b34fb'; // Пример характеристики, заменить при необходимости
+    function log(text) {
+      const logBox = document.getElementById('log');
+      logBox.textContent += text + "\n";
+    }
 
-    async function connectAndUnlock() {
-      const status = document.getElementById('status');
-      status.textContent = "Поиск велосипеда...";
-
+    async function connectAndTestService() {
+      log("Поиск велосипеда...");
       try {
+        const key = document.getElementById('encryptionKey').value.trim();
+        if (!/^[0-9a-fA-F]{32}$/.test(key)) {
+          alert("Неверный ключ — требуется 32 hex символа.");
+          return;
+        }
+
+        const serviceUUID = document.getElementById('uuid').value;
+
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'VANMOOF' }],
-          optionalServices: [SERVICE_UUID]
+          optionalServices: [serviceUUID]
         });
 
-        status.textContent = "Подключение к " + device.name + "...";
+        log("🔗 Подключение к " + device.name + "...");
         const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(SERVICE_UUID);
-        const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+        const service = await server.getPrimaryService(serviceUUID);
 
-        const code = document.getElementById('unlockCode').value.trim();
-        if (!code || code.length < 4) {
-          status.textContent = "Пожалуйста, введите действительный код.";
+        log("✅ Сервис " + serviceUUID + " найден.");
+
+        const characteristics = await service.getCharacteristics();
+        log("Найдено характеристик: " + characteristics.length);
+
+        for (let char of characteristics) {
+          log("➡ Характеристика: " + char.uuid);
+        }
+
+        // Найдём подходящую характеристику (можно уточнить позже)
+        const writeChar = characteristics.find(c => c.properties.write);
+        if (!writeChar) {
+          log("❌ Нет доступных характеристик для записи.");
           return;
         }
 
         const encoder = new TextEncoder();
-        const value = encoder.encode(code);
-        await characteristic.writeValue(value);
+        const value = encoder.encode(key);
+        await writeChar.writeValue(value);
 
-        status.textContent = "🚲 Велосипед разблокирован!";
-      } catch (err) {
-        console.error(err);
-        status.textContent = "Ошибка: " + err.message;
+        log("🚲 Велосипед разблокирован! Ключ записан в: " + writeChar.uuid);
+      } catch (e) {
+        log("❌ Ошибка: " + e.message);
+        console.error(e);
       }
     }
   </script>
 </body>
-</html>"
+</html>
+
 
