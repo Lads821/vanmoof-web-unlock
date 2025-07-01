@@ -2,40 +2,82 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>🚲 Разблокировка VanMoof</title>
+  <title>Разблокировка VanMoof + Скорость</title>
+  <script src="https://cdn.jsdelivr.net/npm/vanbike-lib/dist/vanbike-lib.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #f2f2f2;
-      padding: 20px;
-    }
-    button {
-      margin: 5px;
-      padding: 10px 15px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    pre {
-      background: #000;
-      color: #0f0;
-      padding: 10px;
-      height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-    }
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    input, button, select { margin: 10px; padding: 8px; }
+    #log { text-align: left; margin: 20px auto; max-width: 500px; background: #eee; padding: 10px; border-radius: 6px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h2>🔐 Безопасная разблокировка VanMoof</h2>
 
-  <button id="connect">🔗 Подключиться к велосипеду</button>
-  <button id="set25">🚲 Установить лимит 25 км/ч</button>
-  <button id="set32">🚀 Установить лимит 32 км/ч</button>
+<h2>🔒 Разблокировка VanMoof + Установка скорости</h2>
 
-  <h3>🪵 Лог:</h3>
-  <pre id="log">Готово к работе...\n</pre>
+<input type="text" id="unlockKey" placeholder="Введите код разблокировки">
+<br>
+<button id="btnUnlock">🔓 Разблокировать</button>
+<button id="btn25">🚲 Установить лимит 25 км/ч</button>
+<button id="btn32">🎓 Установить лимит 32 км/ч</button>
 
-  <script src="index.js"></script>
+<div id="log"></div>
+
+<script>
+const logDiv = document.getElementById('log');
+function log(msg) {
+  const time = new Date().toLocaleTimeString();
+  logDiv.textContent += `\n[${time}] ${msg}`;
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+let service = null;
+
+async function connectAndPrepare() {
+  const key = document.getElementById('unlockKey').value.trim();
+  if (!key) return log('❌ Введите код разблокировки');
+  const profile = new vanbikeLib.ElectrifiedSX1Profile();
+  service = new vanbikeLib.VanBikeService(profile, key);
+  const bike = await service.requestDevice();
+  await bike.connect();
+  return bike;
+}
+
+btnUnlock.onclick = async () => {
+  try {
+    log('🔍 Поиск велосипеда...');
+    const bike = await connectAndPrepare();
+    log('✅ Велосипед разблокирован!');
+    await bike.disconnect();
+  } catch (e) {
+    log('❌ ' + e);
+  }
+};
+
+btn25.onclick = async () => {
+  try {
+    log('⚙️ Установка лимита 25 км/ч...');
+    const bike = await connectAndPrepare();
+    await service.setRegion('EU');
+    log('✅ Установлен европейский лимит 25 км/ч');
+    await bike.disconnect();
+  } catch (e) {
+    log('❌ ' + e);
+  }
+};
+
+btn32.onclick = async () => {
+  try {
+    log('🚀 Установка лимита 32 км/ч...');
+    const bike = await connectAndPrepare();
+    await service.setRegion('US');
+    log('✅ Установлен лимит 32 км/ч (США)');
+    await bike.disconnect();
+  } catch (e) {
+    log('❌ ' + e);
+  }
+};
+</script>
+
 </body>
 </html>
 
